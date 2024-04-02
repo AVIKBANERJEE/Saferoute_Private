@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Geolocation</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css"
+    />
+    <link rel="stylesheet" href="app/static/templates/styles.css" />
+    <!-- Include Turf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/5.1.6/turf.min.js"></script>
+
+    <!-- Include Leaflet and Leaflet Routing Machine CSS and JS -->
+    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      #search-container {
+        position: absolute;
+        top: 10px;
+        left: 70px;
+        padding: 10px;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 10px;
+        z-index: 1000;
+      }
+
+      /* Make the map full screen */
+      #map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      #coordinates-container {
+        position: absolute;
+        top: 60px;
+        left: 80px;
+        padding: 0.1px;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 7px;
+        z-index: 1000;
+      }
+      #route-buttons-container {
+        position: absolute;
+        top: 20px;
+        left: 525px;
+        z-index: 1000;
+      }
+      /* Add this style for the custom marker */
+      .custom-marker {
+        width: 20px;
+        height: 20px;
+      }
+
+      .custom-marker .circle {
+        width: 100%;
+        height: 100%;
+        background-color: rgba(
+          0,
+          0,
+          255,
+          0.5
+        ); /* Blue semi-transparent color */
+        border-radius: 50%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="search-container">
+      <input type="text" id="source-location" placeholder="Enter source location"/>
+      <input type="text" id="destination-location" placeholder="Enter destination location"/>
+      <button onclick="findRoute()">Find Route</button>
+    </div>
+    <div id="map"></div>
+    <div id="coordinates-container">
+      <p id="marker-coordinates">
+        Latitude: <span id="latitude"></span>, Longitude:
+        <span id="longitude"></span>
+      </p>
+    </div>
+    <div id="route-buttons-container">
+      <button onclick="suggestAlternativeRoute()">
+        Suggest Alternative Route
+      </button>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/@turf/turf@7.1.6/turf.min.js"></script>
+
+    <script>
+      var map = L.map("map").setView([22.5726, 88.3639], 5);
+
+      // ... (rest of the map initialization code) ...
+      mapLink = "<a href='http://openstreetmap.org'>OpenStreetMap</a>";
+      L.tileLayer("https://{s}.tile.osm.org/{z}/{x}/{y}.png", {
+        attribution: "Leaflet &copy; " + mapLink + ", contribution",
+        maxZoom: 18,
+      }).addTo(map);
+
+      var terrainLayer = L.tileLayer(
+        "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+        {
+          attribution: "Terrain layer",
+        }
+      );
+
+      var trafficLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution: "Traffic layer",
+        }
+      );
+
+      var transitLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution: "Transit layer",
+        }
+      );
+
+      var bikingLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution: "Biking layer",
+        }
+      );
+
+      var streetViewLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution: "Street View layer",
+        }
+      );
+
+      var baseLayers = {
+        Standard: L.tileLayer(
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        ),
+        Terrain: terrainLayer,
+        Traffic: trafficLayer,
+        Transit: transitLayer,
+        Biking: bikingLayer,
+        "Street View": streetViewLayer,
+      };
+
+      L.control.layers(baseLayers).addTo(map);
+
+      var sourceMarker = L.marker([0, 0]).addTo(map);
+      var destinationMarker = L.marker([0, 0]).addTo(map);
+      var routingControl = null;
+
+      // Load the JSON data asynchronously
+      var jsonData = [
+        { Latitude: 53.7551300078, Longitude: -1.4867931724 },
+        { Latitude: 53.8002867427, Longitude: -1.5448477414 },
+        { Latitude: 53.8002867427, Longitude: -1.5448477414 },
+        { Latitude: 53.8002867427, Longitude: -1.5448477414 },
+        { Latitude: 53.8002867427, Longitude: -1.5448477414 },
+        { Latitude: 53.8002867427, Longitude: -1.5448477414 },
+        { Latitude: 53.7881898237, Longitude: -1.56697208 },
+        { Latitude: 53.8056616396, Longitude: -1.628365975 },
+        { Latitude: 53.8077110749, Longitude: -1.6493340578 },
+        { Latitude: 53.800564141, Longitude: -1.5259572646 },
+        { Latitude: 53.8071955132, Longitude: -1.5187302415 },
+        { Latitude: 53.7966280287, Longitude: -1.5330002713 },
+        { Latitude: 53.7959608347, Longitude: -1.5513010134 },
+        { Latitude: 53.8065278184, Longitude: -1.5114187021 },
+        { Latitude: 53.8106349091, Longitude: -1.5700212059 },
+        { Latitude: 53.8238893654, Longitude: -1.5793649406 },
+        { Latitude: 53.9095892524, Longitude: -1.6619383976 },
+        { Latitude: 53.7478494799, Longitude: -1.6027942485 },
+        { Latitude: 53.8008681609, Longitude: -1.5255590803 },
+        { Latitude: 53.8090941177, Longitude: -1.5170228666 },
+        { Latitude: 53.8602673469, Longitude: -1.6796231739 },
+        { Latitude: 53.8050627715, Longitude: -1.5481214451 },
+        { Latitude: 53.8050627715, Longitude: -1.5481214451 },
+        { Latitude: 53.8050627715, Longitude: -1.5481214451 },
+        { Latitude: 53.7967322738, Longitude: -1.4880467222 },
+        { Latitude: 53.7723370584, Longitude: -1.5362891362 },
+        { Latitude: 53.7723370584, Longitude: -1.5362891362 },
+        { Latitude: 53.7723370584, Longitude: -1.5362891362 },
+        { Latitude: 53.7898255565, Longitude: -1.5242264358 },
+        { Latitude: 53.7772746303, Longitude: -1.5537005264 },
+        { Latitude: 53.7772746303, Longitude: -1.5537005264 },
+        { Latitude: 53.7772746303, Longitude: -1.5537005264 },
+        { Latitude: 53.777603288, Longitude: -1.5698579398 },
+        { Latitude: 53.7964136427, Longitude: -1.5619534871 },
+        { Latitude: 53.7645450165, Longitude: -1.5627856551 },
+        { Latitude: 53.8376341937, Longitude: -1.6120511477 },
+        { Latitude: 53.8376341937, Longitude: -1.6120511477 },
+        { Latitude: 53.7452596721, Longitude: -1.6218783816 },
+        { Latitude: 53.807269602, Longitude: -1.5493884758 },
+        { Latitude: 53.8276243398, Longitude: -1.5052330616 },
+        { Latitude: 53.7682279413, Longitude: -1.5772207068 },
+        { Latitude: 53.7482534254, Longitude: -1.636651522 },
+        { Latitude: 53.7482534254, Longitude: -1.636651522 },
+        { Latitude: 53.7482534254, Longitude: -1.636651522 },
+        { Latitude: 53.8168487329, Longitude: -1.6022032772 },
+        { Latitude: 53.801083384, Longitude: -1.5254351878 },
+        { Latitude: 53.8179552275, Longitude: -1.6024965873 },
+        { Latitude: 53.7997940202, Longitude: -1.5266795268 },
+        { Latitude: 53.817474176, Longitude: -1.5178227193 },
+        { Latitude: 53.8363781652, Longitude: -1.4713799781 },
+        { Latitude: 53.8363781652, Longitude: -1.4713799781 },
+        { Latitude: 53.8127425768, Longitude: -1.5213396935 },
+        { Latitude: 53.7827520906, Longitude: -1.5357342633 },
+        { Latitude: 53.7827520906, Longitude: -1.5357342633 },
+        { Latitude: 53.7624865439, Longitude: -1.5271899501 },
+        { Latitude: 53.812323141, Longitude: -1.5476029781 },
+        { Latitude: 53.7988231362, Longitude: -1.5381682196 },
+        { Latitude: 53.7988231362, Longitude: -1.5381682196 },
+        { Latitude: 53.8916766458, Longitude: -1.6343748914 },
+        { Latitude: 53.8916766458, Longitude: -1.6343748914 },
+        { Latitude: 53.8916766458, Longitude: -1.6343748914 },
+        { Latitude: 53.8313806376, Longitude: -1.6633732527 },
+        { Latitude: 53.8006443894, Longitude: -1.4084100808 },
+        { Latitude: 53.801079852, Longitude: -1.5574410756 },
+        { Latitude: 53.7934961765, Longitude: -1.6601394302 },
+        { Latitude: 53.729795294, Longitude: -1.5111411966 },
+        { Latitude: 53.729795294, Longitude: -1.5111411966 },
+        { Latitude: 53.7983519724, Longitude: -1.5279558671 },
+        { Latitude: 53.7983519724, Longitude: -1.5279558671 },
+        { Latitude: 53.8246412481, Longitude: -1.5633911068 },
+        { Latitude: 53.8002128162, Longitude: -1.599764395 },
+        { Latitude: 53.8114602855, Longitude: -1.4851489243 },
+        { Latitude: 53.8495717181, Longitude: -1.6537119065 },
+        { Latitude: 53.8717272324, Longitude: -1.5962383875 },
+        { Latitude: 53.8717272324, Longitude: -1.5962383875 },
+        { Latitude: 53.9080049569, Longitude: -1.6946017621 },
+        { Latitude: 53.7961644621, Longitude: -1.5480804143 },
+        { Latitude: 53.7883410877, Longitude: -1.5238637614 },
+        { Latitude: 53.8479255302, Longitude: -1.6291623965 },
+        { Latitude: 53.8781488996, Longitude: -1.7250279302 },
+        { Latitude: 53.8312313011, Longitude: -1.5541150959 },
+        { Latitude: 53.7486382481, Longitude: -1.6361022976 },
+        { Latitude: 53.7884716866, Longitude: -1.4282223531 },
+        { Latitude: 53.8360617758, Longitude: -1.4608685066 },
+        { Latitude: 53.7860377205, Longitude: -1.532389292 },
+        { Latitude: 53.7864027474, Longitude: -1.4278710259 },
+        { Latitude: 53.7837460018, Longitude: -1.5995415955 },
+        { Latitude: 53.8018672016, Longitude: -1.5080414176 },
+        { Latitude: 53.8241341537, Longitude: -1.5314033502 },
+        { Latitude: 53.8245521738, Longitude: -1.6674536851 },
+        { Latitude: 53.8245521738, Longitude: -1.6674536851 },
+        { Latitude: 53.7575235357, Longitude: -1.5267906418 },
+        { Latitude: 53.8164414941, Longitude: -1.5986681975 },
+        { Latitude: 53.8070539108, Longitude: -1.5422689307 },
+        { Latitude: 53.7484626423, Longitude: -1.5404339208 },
+        { Latitude: 53.8086245226, Longitude: -1.4656091431 },
+        { Latitude: 53.8036910724, Longitude: -1.4822376228 },
+        { Latitude: 53.8239969454, Longitude: -1.5471734764 },
+        { Latitude: 53.8236761077, Longitude: -1.5800658698 },
+        { Latitude: 53.8483759568, Longitude: -1.5340208314 },
+        { Latitude: 53.7472146498, Longitude: -1.595718841 },
+        { Latitude: 53.9057243974, Longitude: -1.6920003911 },
+        { Latitude: 53.7878064766, Longitude: -1.5703455922 },
+        { Latitude: 53.7517974769, Longitude: -1.5312073931 },
+        { Latitude: 53.7278492175, Longitude: -1.5811571277 },
+        { Latitude: 53.8443371193, Longitude: -1.6141930283 },
+        { Latitude: 53.7412355498, Longitude: -1.5085371854 },
+        { Latitude: 53.7314546222, Longitude: -1.5102882687 },
+        { Latitude: 53.8061277865, Longitude: -1.6081964164 },
+        { Latitude: 53.7861084305, Longitude: -1.4043343772 },
+        { Latitude: 53.8111668079, Longitude: -1.4943404842 },
+        { Latitude: 53.7797778281, Longitude: -1.5244614325 },
+        { Latitude: 53.7957823024, Longitude: -1.5327819442 },
+        { Latitude: 53.8004910749, Longitude: -1.5969681132 },
+        { Latitude: 53.870019966, Longitude: -1.7044592775 },
+        { Latitude: 53.870019966, Longitude: -1.7044592775 },
+        { Latitude: 53.796480489, Longitude: -1.5343530526 },
+        { Latitude: 53.796480489, Longitude: -1.5343530526 },
+        { Latitude: 53.7927135783, Longitude: -1.4281191515 },
+        { Latitude: 53.7927135783, Longitude: -1.4281191515 },
+        { Latitude: 53.7927135783, Longitude: -1.4281191515 },
+        { Latitude: 53.8177270519, Longitude: -1.5158908058 },
+        { Latitude: 53.7509396736, Longitude: -1.6333072465 },
+        { Latitude: 53.792922901, Longitude: -1.5301723657 },
+        { Latitude: 53.765399383, Longitude: -1.5319510187 },
+        { Latitude: 53.8147958209, Longitude: -1.4770584064 },
+        { Latitude: 53.7870586207, Longitude: -1.5245764618 },
+        { Latitude: 53.749278914, Longitude: -1.6339737629 },
+        { Latitude: 53.7776232089, Longitude: -1.5507681393 },
+        { Latitude: 53.7776232089, Longitude: -1.5507681393 },
+        { Latitude: 53.7776232089, Longitude: -1.5507681393 },
+        { Latitude: 53.7776232089, Longitude: -1.5507681393 },
+        { Latitude: 53.7776232089, Longitude: -1.5507681393 },
+        { Latitude: 53.851559707, Longitude: -1.5391995373 },
+        { Latitude: 53.7854605813, Longitude: -1.5296030629 },
+        { Latitude: 53.8067574322, Longitude: -1.5193122901 },
+        { Latitude: 53.908606172, Longitude: -1.6737128892 },
+        { Latitude: 53.908606172, Longitude: -1.6737128892 },
+        { Latitude: 53.7278722018, Longitude: -1.5648938324 },
+        { Latitude: 53.7683157255, Longitude: -1.5921937892 },
+        { Latitude: 53.7777602408, Longitude: -1.5188847879 },
+        { Latitude: 53.8426671874, Longitude: -1.53365864 },
+        { Latitude: 53.8061605158, Longitude: -1.4879926644 },
+        { Latitude: 53.8061605158, Longitude: -1.4879926644 },
+        { Latitude: 53.8061605158, Longitude: -1.4879926644 },
+      ];
+
+      // Loop through the data and create markers
+
+      jsonData.forEach((point) => {
+        console.log("Processing data point:", point);
+        var latitude = point.Latitude; // Replace 'Latitude' with the actual property name in your data
+        var longitude = point.Longitude; // Replace 'Longitude' with the actual property name in your data
+        if (!isNaN(latitude) && !isNaN(longitude)) {
+          // Create a custom icon with a blue semi-transparent circle
+          // TODO: to show the name of the particular place from latitude and longitude
+          var customIcon = L.divIcon({
+            className: "custom-marker",
+            html: '<div class="circle"></div>',
+            iconSize: [20, 20],
+          });
+          // Use the custom icon for the marker
+          var marker = L.marker([latitude, longitude], {
+            icon: customIcon,
+          }).addTo(map);
+          marker.bindPopup(
+            `<b>${point["Accident Fields_Reference Number"]}</b><br>Latitude: ${latitude}, Longitude: ${longitude}`
+          );
+        } else {
+          console.error("Invalid coordinates for data point:", point);
+        }
+      });
+
+      // ... (rest of the JavaScript code) ...
+
+      function findRoute() {
+        // Your existing findRoute function code
+        var sourceLocation = document.getElementById("source-location").value;
+        var destinationLocation = document.getElementById(
+          "destination-location"
+        ).value;
+
+        // Clear previous markers and routing control
+        map.removeLayer(sourceMarker);
+        map.removeLayer(destinationMarker);
+        if (routingControl) {
+          map.removeControl(routingControl);
+        }
+
+        // Geocode source and destination using MapQuest API
+        geocodeAddress(sourceLocation, function (sourceCoordinates) {
+          geocodeAddress(
+            destinationLocation,
+            function (destinationCoordinates) {
+              // Add new static markers at the source and destination locations
+              sourceMarker = L.marker(sourceCoordinates).addTo(map);
+              destinationMarker = L.marker(destinationCoordinates).addTo(map);
+
+              // Define waypoints for routing
+              var waypoints = [
+                L.latLng(sourceCoordinates[0], sourceCoordinates[1]),
+                L.latLng(destinationCoordinates[0], destinationCoordinates[1]),
+              ];
+
+              // Create a routing control and set the waypoints
+              routingControl = L.Routing.control({
+                waypoints: waypoints,
+                routeWhileDragging: true, // Display route while dragging
+                show: true, // Show the route initially
+              }).addTo(map);
+
+              // Show the route
+              routingControl.route();
+            }
+          );
+        });
+      }
+
+      function geocodeAddress(address, callback) {
+        // Your existing geocodeAddress function code
+        var url =
+          "https://nominatim.openstreetmap.org/search?format=json&q=" + address;
+
+        fetch(url)
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("Network response was not ok");
+            }
+            return response.json();
+          })
+          .then(function (data) {
+            if (data && data.length > 0) {
+              var lat = parseFloat(data[0].lat);
+              var lon = parseFloat(data[0].lon);
+              callback([lat, lon]);
+            } else {
+              console.error("Geocoding response did not contain valid data");
+            }
+          })
+          .catch(function (error) {
+            console.error("Error:", error);
+          });
+      }
+
+      map.on("click", function (e) {
+        // Your existing map click event code
+        // Create a new marker at the clicked location
+        var newMarker = L.marker(e.latlng).addTo(map);
+
+        // Display latitude and longitude of the new marker
+        var latitudeDisplay = document.getElementById("latitude");
+        var longitudeDisplay = document.getElementById("longitude");
+        latitudeDisplay.textContent = e.latlng.lat.toFixed(6);
+        longitudeDisplay.textContent = e.latlng.lng.toFixed(6);
+      });
+
+      // ... (previous script)
+
+      // Function to filter accidents along the route
+      function getSafeRoute(routeCoordinates) {
+        // Filter accidents that are within a certain distance (e.g., 1 km) from the route
+        var safeRoute = routeCoordinates.filter(function (routeCoord) {
+          var isSafe = jsonData.every(function (accident) {
+            var accidentPoint = turf.point([
+              accident.Latitude,
+              accident.Longitude,
+            ]);
+            var distance =
+              turf.distance(accidentPoint, turf.point(routeCoord)) * 1000; // Convert to meters
+            // Adjust the distance threshold as needed (e.g., 1 km)
+            return distance > 1000; // 1 km
+          });
+
+          return isSafe;
+        });
+
+        return safeRoute;
+      }
+
+      // ... (rest of the script)
+
+      // Function to suggest an alternative route
+      function suggestAlternativeRoute() {
+        if (routingControl) {
+          map.removeControl(routingControl);
+        }
+
+        // Get the current source and destination coordinates
+        var sourceLocation = document.getElementById("source-location").value;
+        var destinationLocation = document.getElementById(
+          "destination-location"
+        ).value;
+
+        // Geocode source and destination using MapQuest API
+        geocodeAddress(sourceLocation, function (sourceCoordinates) {
+          geocodeAddress(
+            destinationLocation,
+            function (destinationCoordinates) {
+              // Define waypoints for routing
+              var waypoints = [
+                L.latLng(sourceCoordinates[0], sourceCoordinates[1]),
+                L.latLng(destinationCoordinates[0], destinationCoordinates[1]),
+              ];
+
+              // Create a routing control and set the waypoints with createAlternatives: true
+              routingControl = L.Routing.control({
+                waypoints: waypoints,
+                routeWhileDragging: true, // Display route while dragging
+                show: true, // Show the route initially
+                createAlternatives: true, // Allow the control to generate alternative routes
+                lineOptions: {
+                  styles: [{ color: "blue", opacity: 0.8, weight: 5 }],
+                },
+              }).addTo(map);
+
+              // Listen for the 'routeselected' event
+              routingControl.on("routeselected", function (e) {
+                var route = e.route;
+
+                if (
+                  route &&
+                  route.coordinates &&
+                  route.coordinates.length > 0
+                ) {
+                  // Extract coordinates from the selected route
+                  var routeCoordinates = route.coordinates.map(function (
+                    coord
+                  ) {
+                    return [coord.lat, coord.lng];
+                  });
+
+                  // Check for accidents along the selected route
+                  var safeRoute = getSafeRoute(routeCoordinates);
+
+                  if (safeRoute.length > 0) {
+                    // Display or use the safe route as needed
+                    console.log("Safe route coordinates:", safeRoute);
+                  } else {
+                    alert("No safe route available.");
+                  }
+                } else {
+                  console.error("No valid route coordinates available.");
+                }
+              });
+
+              // Show the route
+              routingControl.route();
+            }
+          );
+        });
+      }
+    </script>
+  </body>
+</html>

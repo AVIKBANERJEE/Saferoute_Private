@@ -1,0 +1,101 @@
+{%extends 'base.html'%}
+{%block content%}
+    <title>Geolocation</title>
+    
+    <div id="search-container">
+        <input type="text" id="source-location" placeholder="Enter source location">
+        <input type="text" id="destination-location" placeholder="Enter destination location">
+        <button id="find-route-button">Find Route</button>
+    </div>
+    <div id="map"></div>
+       <!--<div id="coordinates-container">
+            <p id="marker-coordinates">Latitude: <span id="latitude"></span>, Longitude: <span id="longitude"></span></p>
+        </div>
+        <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script> 
+
+     <script>
+        var map = L.map('map').setView([28.2380, 83.9956], 11);
+        mapLink = "<a href='http://openstreetmap.org'>OpenStreetMap</a>";
+        L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', { attribution: 'Leaflet &copy; ' + mapLink + ', contribution', maxZoom: 18 }).addTo(map);
+
+        var sourceMarker = L.marker([0, 0]).addTo(map);
+        var destinationMarker = L.marker([0, 0]).addTo(map);
+        var routingControl = null;
+
+        function findRoute() {
+            var sourceLocation = document.getElementById('source-location').value;
+            var destinationLocation = document.getElementById('destination-location').value;
+
+            // Clear previous markers and routing control
+            map.removeLayer(sourceMarker);
+            map.removeLayer(destinationMarker);
+            if (routingControl) {
+                map.removeControl(routingControl);
+            }
+
+            // Geocode source and destination using MapQuest API
+            geocodeAddress(sourceLocation, function (sourceCoordinates) {
+                geocodeAddress(destinationLocation, function (destinationCoordinates) {
+                    // Add new static markers at the source and destination locations
+                    sourceMarker = L.marker(sourceCoordinates).addTo(map);
+                    destinationMarker = L.marker(destinationCoordinates).addTo(map);
+
+                    // Define waypoints for routing
+                    var waypoints = [
+                        L.latLng(sourceCoordinates[0], sourceCoordinates[1]),
+                        L.latLng(destinationCoordinates[0], destinationCoordinates[1])
+                    ];
+
+                    // Create a routing control and set the waypoints
+                    routingControl = L.Routing.control({
+                        waypoints: waypoints,
+                        routeWhileDragging: true, // Display route while dragging
+                        show: true // Show the route initially
+                    }).addTo(map);
+
+                    // Show the route
+                    routingControl.route();
+                });
+            });
+        }
+
+        function geocodeAddress(address, callback) {
+            var url = "https://nominatim.openstreetmap.org/search?format=json&q=" + address;
+
+            fetch(url)
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (data && data.length > 0) {
+                        var lat = parseFloat(data[0].lat);
+                        var lon = parseFloat(data[0].lon);
+                        callback([lat, lon]);
+                    } else {
+                        console.error('Geocoding response did not contain valid data');
+                    }
+                })
+                .catch(function (error) {
+                    console.error('Error:', error);
+                });
+        }
+
+        // Add the ability to add markers anywhere on the map
+        map.on('click', function (e) {
+            // Create a new marker at the clicked location
+            var newMarker = L.marker(e.latlng).addTo(map);
+
+            // Display latitude and longitude of the new marker
+            var latitudeDisplay = document.getElementById('latitude');
+            var longitudeDisplay = document.getElementById('longitude');
+            latitudeDisplay.textContent = e.latlng.lat.toFixed(6);
+            longitudeDisplay.textContent = e.latlng.lng.toFixed(6);
+        });
+    </script> -->
+    <!-- Include your script.js file -->
+    
+{%endblock%}
